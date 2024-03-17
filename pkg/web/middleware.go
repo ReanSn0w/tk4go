@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"strings"
+
+	"github.com/ReanSn0w/tk4go/pkg/tools"
 )
 
 // OptionalMiddlewares returns a middleware that applies the given middlewares
@@ -24,7 +26,7 @@ func OptionalMiddlewares(active bool, middlewares ...func(http.Handler) http.Han
 
 // LoggerMiddleware is a middleware that logs requests and responses
 // middleware uses [DEBUG] level
-func LoggerMiddleware(logger Logger) func(http.Handler) http.Handler {
+func LoggerMiddleware(logger tools.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			dumpBody := strings.Contains(r.Header.Get("Content-Type"), "json")

@@ -9,19 +9,15 @@ import (
 )
 
 // NewServer creates a new server instance
-func NewServer(logger Logger) *Server {
+func NewServer(logger tools.Logger) *Server {
 	return &Server{
 		log: logger,
 	}
 }
 
 type (
-	Logger interface {
-		Logf(format string, args ...interface{})
-	}
-
 	Server struct {
-		log Logger
+		log tools.Logger
 		srv *http.Server
 	}
 )

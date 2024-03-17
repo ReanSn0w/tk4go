@@ -11,7 +11,7 @@ import (
 )
 
 // NewClient creates a new client instance
-func NewClient(logger Logger, baseURL string, prepare ...PrepareClientFn) (client *Client, err error) {
+func NewClient(logger tools.Logger, baseURL string, prepare ...PrepareClientFn) (client *Client, err error) {
 	base, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, err
@@ -34,7 +34,7 @@ type (
 
 	Client struct {
 		base *url.URL
-		log  Logger
+		log  tools.Logger
 		cl   *http.Client
 	}
 )
