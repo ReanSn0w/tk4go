@@ -1,4 +1,4 @@
-package tools
+package config
 
 import (
 	"log"
@@ -6,7 +6,7 @@ import (
 	"github.com/umputun/go-flags"
 )
 
-func ParseConfig(opts any) error {
+func Parse(opts any) error {
 	p := flags.NewParser(&opts, flags.PrintErrors|flags.PassDoubleDash|flags.HelpFlag|flags.IgnoreUnknown)
 	p.SubcommandsOptional = true
 
