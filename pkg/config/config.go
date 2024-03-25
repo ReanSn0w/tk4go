@@ -32,9 +32,6 @@ func Print(log tools.Logger, title string, revision string, opts any) {
 
 func structPrinter(b io.Writer, lvl int, v any) {
 	val := reflect.ValueOf(v)
-	if val.IsNil() {
-		return
-	}
 
 	switch val.Kind() {
 	case reflect.Ptr:
