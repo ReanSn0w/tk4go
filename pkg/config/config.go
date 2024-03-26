@@ -2,9 +2,11 @@ package config
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"log"
 	"reflect"
+	"strings"
 
 	"github.com/ReanSn0w/tk4go/pkg/tools"
 	"github.com/umputun/go-flags"
@@ -26,32 +28,52 @@ func Parse(opts any) error {
 
 func Print(log tools.Logger, title string, revision string, opts any) {
 	buf := new(bytes.Buffer)
-	structPrinter(buf, 0, opts)
-	log.Logf("\nApplication: %v (rev: %v) \n%s", title, revision, buf.String())
+	structPrinter(buf, 0, "", opts)
+	log.Logf("\nApplication: %v (rev: %v) \n\nConfiguration:\n%s", title, revision, buf.String())
 }
 
-func structPrinter(b io.Writer, lvl int, v any) {
+func structPrinter(b io.Writer, lvl int, name string, v any) {
 	val := reflect.ValueOf(v)
 
 	switch val.Kind() {
 	case reflect.Ptr:
 		val = val.Elem()
-		structPrinter(b, lvl, val.Interface())
+		structPrinter(b, lvl, "", val.Interface())
 		return
 	case reflect.Struct:
 		for i := 0; i < val.NumField(); i++ {
 			field := val.Field(i)
-			structPrinter(b, lvl+1, field.Interface())
+			val := val.Type().Field(i).Name
+
+			if field.Kind() == reflect.Ptr {
+				if field.IsZero() {
+					printSingleValue(b, lvl+1, val, "nil")
+					continue
+				}
+
+				field = field.Elem()
+			}
+
+			if field.Kind() == reflect.Struct {
+				printSingleValue(b, lvl+1, val, "")
+			}
+
+			structPrinter(b, lvl+1, val, field.Interface())
 		}
 	default:
-		// print value
-		name := val.Type().Name()
-		val = reflect.Indirect(val)
-
-		for i := 0; i < lvl; i++ {
-			b.Write([]byte("  "))
-		}
-
-		b.Write([]byte(name + ": " + val.String() + "\n"))
+		printSingleValue(b, lvl, name, val.Interface())
 	}
+}
+
+func printSingleValue(b io.Writer, tab int, name string, val any) {
+	for i := 0; i < tab; i++ {
+		b.Write([]byte("  "))
+	}
+
+	switch strings.ToLower(name) {
+	case "password", "pass", "token", "secret":
+		val = "********"
+	}
+
+	b.Write([]byte(fmt.Sprintf("%s:  %v\n", name, val)))
 }
