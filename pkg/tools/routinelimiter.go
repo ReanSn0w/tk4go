@@ -4,12 +4,12 @@ package tools
 // количества одновременно запущенных горутин
 func NewRoutineLimiter(max int) *RoutineLimiter {
 	return &RoutineLimiter{
-		ch: make(chan []bool, max),
+		ch: make(chan struct{}, max),
 	}
 }
 
 type RoutineLimiter struct {
-	ch chan []bool
+	ch chan struct{}
 }
 
 // Run запускает задачу в горутине
@@ -17,7 +17,7 @@ type RoutineLimiter struct {
 // то ожидает освобождения слота
 // перед запуском задачи
 func (r *RoutineLimiter) Run(task func()) {
-	r.ch <- []bool{true}
+	r.ch <- struct{}{}
 
 	go func() {
 		task()
