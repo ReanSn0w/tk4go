@@ -9,11 +9,13 @@ import (
 	"github.com/ReanSn0w/tk4go/pkg/tools"
 )
 
+// NewTemplate создает новый экземпляр шаблона
 func NewTemplate(log tools.Logger, dir, errorTMPL string) (*Template, error) {
 	tmpl := template.New("")
 	return ParseTemplate(log, tmpl, dir, errorTMPL)
 }
 
+// ParseTemplate парсит шаблоны из директории
 func ParseTemplate(log tools.Logger, tmpl *template.Template, dir string, errorTMPL string) (*Template, error) {
 	tmpl, err := tmpl.ParseGlob(dir + "/*.html")
 	return &Template{tmpl: tmpl, log: log, errorTMPL: errorTMPL}, err
@@ -33,6 +35,7 @@ type (
 	}
 )
 
+// Write записывает шаблон в ответ
 func (t *Template) Write(w http.ResponseWriter, code int, data HTMLResponse) {
 	buf := new(bytes.Buffer)
 
