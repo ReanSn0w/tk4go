@@ -23,7 +23,7 @@ type (
 )
 
 // Run starts the server
-func (s *Server) Run(ctx context.Context, port int, h http.Handler) {
+func (s *Server) Run(cancel context.CancelCauseFunc, port int, h http.Handler) {
 	s.srv = &http.Server{
 		Addr:    fmt.Sprintf(":%v", port),
 		Handler: s.prepareHandler(h),
@@ -33,12 +33,10 @@ func (s *Server) Run(ctx context.Context, port int, h http.Handler) {
 		err := s.srv.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
 			s.log.Logf("[ERROR] server failed: %v", err)
+			cancel(err)
 		} else {
 			s.log.Logf("[INFO] server stopped")
 		}
-
-		cancel := tools.GetGlobalCancel(ctx)
-		cancel(err)
 	}()
 }
 

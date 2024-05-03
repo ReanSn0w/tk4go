@@ -35,15 +35,3 @@ func Test_ParseConfigError(t *testing.T) {
 		t.Error("error parsing config: ", err)
 	}
 }
-
-// func Test_Print(t *testing.T) {
-// 	opts.Verbose = true
-// 	opts.Struct = &struct {
-// 		Password string `short:"t" long:"test" description:"Test string"`
-// 	}{
-// 		Password: "test",
-// 	}
-
-// 	config.Print(t, "test", "1.0.0", opts)
-// 	t.Error("error printing config: ", t)
-// }

@@ -3,9 +3,13 @@ package tools
 import "sync"
 
 func NewScheduler[I any, O any](parallel int, task func(I) O) *Scheduler[I, O] {
+	return NewSchedulerWRoutineLimiter(NewRoutineLimiter(parallel), task)
+}
+
+func NewSchedulerWRoutineLimiter[I any, O any](rl *RoutineLimiter, task func(I) O) *Scheduler[I, O] {
 	return &Scheduler[I, O]{
 		wg:   &sync.WaitGroup{},
-		rl:   NewRoutineLimiter(parallel),
+		rl:   rl,
 		fifo: NewFifo[I](),
 		out:  make(chan O),
 		task: task,
@@ -42,6 +46,10 @@ func (s *Scheduler[I, O]) Push(items ...I) {
 
 func (s *Scheduler[I, O]) Out() <-chan O {
 	return s.out
+}
+
+func (s *Scheduler[I, O]) QueryLen() int {
+	return s.fifo.Len()
 }
 
 func (s *Scheduler[I, O]) Wait() {

@@ -27,9 +27,11 @@ func Parse(opts any) error {
 }
 
 func Print(log tools.Logger, title string, revision string, opts any) {
+	log.Logf("[INFO] Application: %v (rev: %v)", title, revision)
+
 	buf := new(bytes.Buffer)
 	structPrinter(buf, 0, "", opts)
-	log.Logf("\nApplication: %v (rev: %v) \n\nConfiguration:\n%s", title, revision, buf.String())
+	log.Logf("[DEBUG] \n%s", buf.String())
 }
 
 func structPrinter(b io.Writer, lvl int, name string, v any) {
