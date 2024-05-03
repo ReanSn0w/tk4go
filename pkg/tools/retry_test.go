@@ -7,7 +7,7 @@ import (
 )
 
 func Test_RetryMechanismErr(t *testing.T) {
-	r := NewRetry(t, 3, time.Second)
+	r := NewRetry(t, 3, 3*time.Second)
 	timestamp := time.Now()
 
 	err := r.Do(func() error {
