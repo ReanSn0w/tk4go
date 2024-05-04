@@ -42,9 +42,9 @@ func (st *ShutdownStack) Wait(ctx context.Context, timeout time.Duration) {
 
 	select {
 	case <-ctx.Done():
-		st.log.Logf("[INFO] Получен сигнал отмены из контекста")
+		st.log.Logf("[INFO] cancel context")
 	case registredSignal := <-quit:
-		st.log.Logf("[INFO] Зарегистрирован системный сигнал: %s", registredSignal.String())
+		st.log.Logf("[INFO] system signal is: %s", registredSignal.String())
 	}
 
 	ctx, done := context.WithTimeout(context.Background(), timeout)
