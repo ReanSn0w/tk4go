@@ -105,7 +105,7 @@ func (r *RequestError) Decode(v interface{}) error {
 // MARK: - JSON
 // Конструкция для отправки запросов через с обработкой JSON
 
-func (c *Client) JSON(path string) *jsonRequest {
+func (c *Client) JSON(path string) JSON {
 	return &jsonRequest{
 		client: c,
 		path:   path,
@@ -114,6 +114,14 @@ func (c *Client) JSON(path string) *jsonRequest {
 		method: http.MethodGet,
 		body:   nil,
 	}
+}
+
+type JSON interface {
+	SetMethod(method string) JSON
+	SetHeader(key, value string) JSON
+	SetQuery(key, value string) JSON
+	SetBody(body interface{}) JSON
+	Do() error
 }
 
 type jsonRequest struct {
@@ -126,22 +134,22 @@ type jsonRequest struct {
 	body   interface{}
 }
 
-func (r *jsonRequest) SetMethod(method string) *jsonRequest {
+func (r *jsonRequest) SetMethod(method string) JSON {
 	r.method = method
 	return r
 }
 
-func (r *jsonRequest) SetHeader(key, value string) *jsonRequest {
+func (r *jsonRequest) SetHeader(key, value string) JSON {
 	r.header.Set(key, value)
 	return r
 }
 
-func (r *jsonRequest) SetQuery(key, value string) *jsonRequest {
+func (r *jsonRequest) SetQuery(key, value string) JSON {
 	r.header.Set(key, value)
 	return r
 }
 
-func (r *jsonRequest) SetBody(body interface{}) *jsonRequest {
+func (r *jsonRequest) SetBody(body interface{}) JSON {
 	r.body = body
 	return r
 }
