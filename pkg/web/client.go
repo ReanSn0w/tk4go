@@ -121,7 +121,7 @@ type JSON interface {
 	SetHeader(key, value string) JSON
 	SetQuery(key, value string) JSON
 	SetBody(body interface{}) JSON
-	Do() error
+	Do(obj any) error
 }
 
 type jsonRequest struct {
@@ -154,7 +154,7 @@ func (r *jsonRequest) SetBody(body interface{}) JSON {
 	return r
 }
 
-func (r *jsonRequest) Do() error {
+func (r *jsonRequest) Do(obj any) error {
 	url := &url.URL{
 		Scheme:   r.client.base.Scheme,
 		Host:     r.client.base.Host,
@@ -204,7 +204,7 @@ func (r *jsonRequest) Do() error {
 		}
 	}
 
-	err = json.NewDecoder(resp.Body).Decode(r.body)
+	err = json.NewDecoder(resp.Body).Decode(obj)
 	if err != nil {
 		r.client.log.Logf("[ERROR] failed to decode response body: %v", err)
 		return err
