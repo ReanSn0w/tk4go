@@ -3,6 +3,8 @@ package web
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -55,56 +57,6 @@ func (p prepareRequest) prepare(req *http.Request) *http.Request {
 	return req
 }
 
-// PrepareClient returns a new client with the given prepare functions
-func (c *Client) Json(method string, path string, query url.Values, reqBody, respBody any) error {
-	buffer := new(bytes.Buffer)
-	enc := json.NewEncoder(buffer)
-	err := enc.Encode(reqBody)
-	if err != nil {
-		c.log.Logf("[ERROR] failed to encode request body: %v", err)
-		return err
-	}
-
-	req, err := http.NewRequest(method, (&url.URL{
-		Scheme:   c.base.Scheme,
-		Host:     c.base.Host,
-		User:     c.base.User,
-		Path:     path,
-		RawQuery: query.Encode(),
-	}).String(), buffer)
-	if err != nil {
-		c.log.Logf("[ERROR] failed to create request: %v", err)
-		return err
-	}
-
-	resp, err := c.Do(req)
-	if err != nil {
-		c.log.Logf("[ERROR] failed to send request: %v", err)
-		return err
-	}
-
-	if resp.StatusCode > 300 {
-		c.log.Logf("[ERROR] request failed with status code: %v", resp.StatusCode)
-
-		respErrorData := Response[tools.ErrorsMap]{}
-		err := json.NewDecoder(resp.Body).Decode(&respErrorData)
-		if err != nil {
-			c.log.Logf("[ERROR] failed to decode failure response body: %v", err)
-			return err
-		}
-
-		return respErrorData.isError()
-	}
-
-	err = json.NewDecoder(resp.Body).Decode(respBody)
-	if err != nil {
-		c.log.Logf("[ERROR] failed to decode success response body: %v", err)
-		return err
-	}
-
-	return nil
-}
-
 // Do sends the request and returns the response
 func (c *Client) Do(req *http.Request, prepare ...PrepareRequestFn) (*http.Response, error) {
 	req = prepareRequest(prepare).prepare(req)
@@ -132,4 +84,123 @@ func (c *Client) dumpBody(contentType string) bool {
 	default:
 		return false
 	}
+}
+
+// MSRK: - Error
+// Конфтрукция для хранения ошибки полученной при ответе от сервера
+
+type RequestError struct {
+	StatusCode int
+	Body       []byte
+}
+
+func (r *RequestError) Error() string {
+	return fmt.Sprintf("requst error (code: %v): %s", r.StatusCode, string(r.Body))
+}
+
+func (r *RequestError) Decode(v interface{}) error {
+	return json.Unmarshal(r.Body, v)
+}
+
+// MARK: - JSON
+// Конструкция для отправки запросов через с обработкой JSON
+
+func (c *Client) JSON(path string) *jsonRequest {
+	return &jsonRequest{
+		client: c,
+		path:   path,
+		header: make(http.Header),
+		query:  make(url.Values),
+		method: http.MethodGet,
+		body:   nil,
+	}
+}
+
+type jsonRequest struct {
+	client *Client
+
+	method string
+	path   string
+	header http.Header
+	query  url.Values
+	body   interface{}
+}
+
+func (r *jsonRequest) SetMethod(method string) *jsonRequest {
+	r.method = method
+	return r
+}
+
+func (r *jsonRequest) SetHeader(key, value string) *jsonRequest {
+	r.header.Set(key, value)
+	return r
+}
+
+func (r *jsonRequest) SetQuery(key, value string) *jsonRequest {
+	r.header.Set(key, value)
+	return r
+}
+
+func (r *jsonRequest) SetBody(body interface{}) *jsonRequest {
+	r.body = body
+	return r
+}
+
+func (r *jsonRequest) Do() error {
+	url := &url.URL{
+		Scheme:   r.client.base.Scheme,
+		Host:     r.client.base.Host,
+		User:     r.client.base.User,
+		Path:     r.path,
+		RawQuery: r.query.Encode(),
+	}
+
+	buffer := new(bytes.Buffer)
+	if r.body != nil {
+		err := json.NewEncoder(buffer).Encode(r.body)
+		if err != nil {
+			r.client.log.Logf("[ERROR] failed to encode request body: %v", err)
+			return err
+		}
+	}
+
+	req, err := http.NewRequest(r.method, url.String(), buffer)
+	if err != nil {
+		r.client.log.Logf("[ERROR] failed to create request: %v", err)
+		return err
+	}
+
+	for key, values := range r.header {
+		for _, value := range values {
+			req.Header.Set(key, value)
+		}
+	}
+
+	resp, err := r.client.Do(req)
+	if err != nil {
+		r.client.log.Logf("[ERROR] failed to send request: %v", err)
+		return err
+	}
+
+	if resp.StatusCode >= 300 {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			r.client.log.Logf("[ERROR] failed to read response body: %v", err)
+			return err
+		}
+
+		r.client.log.Logf("[ERROR] request failed with status code: %v", resp.StatusCode)
+		return &RequestError{
+			StatusCode: resp.StatusCode,
+			Body:       body,
+		}
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(r.body)
+	if err != nil {
+		r.client.log.Logf("[ERROR] failed to decode response body: %v", err)
+		return err
+	}
+
+	return nil
 }
