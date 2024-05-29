@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -10,6 +11,10 @@ import (
 	"net/url"
 
 	"github.com/ReanSn0w/tk4go/pkg/tools"
+)
+
+var (
+	maxBufferSize = 1000 * 512 // 512kb
 )
 
 // NewClient creates a new client instance
@@ -63,9 +68,14 @@ func (c *Client) Do(req *http.Request, prepare ...PrepareRequestFn) (*http.Respo
 	reqDump, _ := httputil.DumpRequest(req, c.dumpBody(req.Header.Get("Content-Type")))
 
 	resp, err := c.cl.Do(req)
-	respDump, _ := httputil.DumpResponse(resp, c.dumpBody(resp.Header.Get("Content-Type")))
+	respDump := []byte{}
+	if err != nil {
+		respDump, _ = httputil.DumpResponse(resp, c.dumpBody(resp.Header.Get("Content-Type")))
+	} else {
+		respDump = []byte("request failed with error: " + err.Error())
+	}
 
-	c.log.Logf("[DEBUG] http client dump:\n\nrequest: %s\nresponse: %s\n", string(reqDump), string(respDump))
+	c.log.Logf("[DEBUG] http client dump:\n\nrequest: %s\n\nresponse: %s\n\n", string(reqDump), string(respDump))
 	return resp, err
 }
 
@@ -122,6 +132,7 @@ type JSON interface {
 	SetQuery(key, value string) JSON
 	SetBody(body interface{}) JSON
 	Do(obj any) error
+	Stream(part any) (<-chan any, error)
 }
 
 type jsonRequest struct {
@@ -211,4 +222,105 @@ func (r *jsonRequest) Do(obj any) error {
 	}
 
 	return nil
+}
+
+// Stream - предназначен для отправки HTTP-запросов и получения потоковых ответов в формате JSON.
+// Метод создает новый HTTP-запрос с заданным путем, методами запроса, заголовками и телом,
+// отправляет его и обрабатывает потоковый ответ.
+//
+// #### Входные параметры:
+// - `part`: Переменная, в которую будут декодироваться части потокового ответа.
+//
+// #### Возвращаемые значения:
+// - `chan<- any`: Канал, в который будут отправляться декодированные части ответа.
+// - `error`: Ошибка, если операция завершилась неуспешно.
+//
+// #### Пример использования:
+// ```go
+// client := NewClient(logger, baseURL)
+// jsonReq := client.JSON("/path/to/resource").SetMethod(http.MethodGet)
+// stream, err := jsonReq.Stream(part)
+//
+//	if err != nil {
+//	    log.Fatalf("Failed to stream: %v", err)
+//	}
+//
+//	for response := range stream {
+//	    // Обработка каждого фрагмента ответа...
+//	}
+//
+// ```
+func (r *jsonRequest) Stream(part any) (<-chan any, error) {
+	url := &url.URL{
+		Scheme:   r.client.base.Scheme,
+		Host:     r.client.base.Host,
+		User:     r.client.base.User,
+		Path:     r.path,
+		RawQuery: r.query.Encode(),
+	}
+
+	buffer := new(bytes.Buffer)
+	if r.body != nil {
+		err := json.NewEncoder(buffer).Encode(r.body)
+		if err != nil {
+			r.client.log.Logf("[ERROR] failed to encode request body: %v", err)
+			return nil, err
+		}
+	}
+
+	req, err := http.NewRequest(r.method, url.String(), buffer)
+	if err != nil {
+		r.client.log.Logf("[ERROR] failed to create request: %v", err)
+		return nil, err
+	}
+
+	for key, values := range r.header {
+		for _, value := range values {
+			req.Header.Set(key, value)
+		}
+	}
+
+	resp, err := r.client.Do(req)
+	if err != nil {
+		r.client.log.Logf("[ERROR] failed to send request: %v", err)
+		return nil, err
+	}
+
+	if resp.StatusCode >= 300 {
+		r.client.log.Logf("[ERROR] stream request failed with status code: %v", resp.StatusCode)
+		return nil, &RequestError{
+			StatusCode: resp.StatusCode,
+			Body: func(b []byte, err error) []byte {
+				if err != nil {
+					return []byte(err.Error())
+				}
+
+				return b
+			}(io.ReadAll(resp.Body)),
+		}
+	}
+
+	out := make(chan any)
+
+	go func() {
+		scanner := bufio.NewScanner(resp.Body)
+		scanBuf := make([]byte, 0, maxBufferSize)
+		scanner.Buffer(scanBuf, maxBufferSize)
+
+		for scanner.Scan() {
+			bts := scanner.Bytes()
+
+			err = json.NewDecoder(bytes.NewReader(bts)).Decode(&part)
+			if err != nil {
+				r.client.log.Logf("[ERROR] failed to decode response body: %v", err)
+				continue
+			}
+
+			out <- part
+		}
+
+		close(out)
+	}()
+
+	return out, nil
 }
