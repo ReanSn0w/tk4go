@@ -69,7 +69,7 @@ func (c *Client) Do(req *http.Request, prepare ...PrepareRequestFn) (*http.Respo
 
 	resp, err := c.cl.Do(req)
 	respDump := []byte{}
-	if err != nil {
+	if err == nil {
 		respDump, _ = httputil.DumpResponse(resp, c.dumpBody(resp.Header.Get("Content-Type")))
 	} else {
 		respDump = []byte("request failed with error: " + err.Error())
